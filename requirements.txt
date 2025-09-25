@@ -2,3 +2,5 @@ pandas
 numpy
 yfinance
 plotly
+papermill
+nbconvert
