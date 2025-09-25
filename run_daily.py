@@ -5,6 +5,7 @@ import nbconvert
 from nbconvert import HTMLExporter
 import nbformat
 
+
 NB_IN  = "WFO_test_no_out.ipynb"
 NB_OUT = "WFO_test_no_out_out.ipynb"
 
@@ -21,7 +22,8 @@ def main():
     pm.execute_notebook(
         input_path=NB_IN,
         output_path=NB_OUT,
-        parameters={}
+        parameters={},
+        kernel_name="python3",   
     )
 
     # 2) สร้าง docs/ และทำ index.html จากโน้ตบุ๊กที่เพิ่งรัน
