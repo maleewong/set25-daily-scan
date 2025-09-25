@@ -4,3 +4,6 @@ yfinance
 plotly
 papermill
 nbconvert
+jupyter
+ipykernel
+nbclient
