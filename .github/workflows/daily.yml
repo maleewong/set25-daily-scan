@@ -72,20 +72,21 @@ jobs:
           echo "START_DATE=$(date -u -d '7 days ago' +'%Y-%m-%d')" >> $GITHUB_ENV
           echo "END_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      # ส่งอีเมลแจ้งลิงก์เว็บ (ตั้ง Secrets: SMTP_USERNAME, SMTP_PASSWORD, MAIL_TO)
       - name: Send report email
         if: ${{ success() }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
-          server_port: 587
-          secure: true
+          server_port: 465
+          secure: true                 # ใช้ SSL/TLS เต็มรูปแบบสำหรับ port 465
           username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}  # Gmail App Password
-          to: ${{ secrets.MAIL_TO }}               # เช่น maleewong@gmail.com หรือหลายคนคั่นด้วยคอมมา
+          password: ${{ secrets.SMTP_PASSWORD }}
+          to: ${{ secrets.MAIL_TO }}
           from: SET25 Bot <${{ secrets.SMTP_USERNAME }}>
           subject: "SET25 daily scan ${{ env.END_DATE }}"
           body: |
             สรุปผลสแกนหุ้น SET25 ช่วง 7 วันล่าสุด: ${{ env.START_DATE }} – ${{ env.END_DATE }}
             ดูรายงาน: ${{ steps.deployment.outputs.page_url }}
+
+
 
