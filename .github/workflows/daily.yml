@@ -130,7 +130,3 @@ jobs:
             ช่วง 7 วันล่าสุด: ${{ env.START_DATE }} – ${{ env.END_DATE }}
             ลิงก์หน้าเว็บ: ${{ steps.deployment.outputs.page_url }}
             ลิงก์ GitHub Issue: ${{ steps.create_issue.outputs.issue_url }}
-
-
-
-
