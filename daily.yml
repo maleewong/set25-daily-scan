@@ -2,22 +2,19 @@ name: daily-report
 
 on:
   schedule:
-    # 04:00 น. เวลาไทย (21:00 UTC)
-    - cron: "0 21 * * *"
+    - cron: "0 21 * * *"   # 04:00 น. ไทย
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      KERNEL_NAME: gha-py311  # ชื่อ kernel ที่จะใช้รัน notebook
+      KERNEL_NAME: gha-py311
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -32,7 +29,6 @@ jobs:
           echo "===== kernelspec list ====="
           jupyter kernelspec list
 
-      # 👉 ใช้ nbconvert รัน notebook และสร้าง HTML (ไม่เรียก run_daily.py)
       - name: Execute notebook -> HTML
         run: |
           mkdir -p docs
@@ -57,5 +53,5 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v4
+
