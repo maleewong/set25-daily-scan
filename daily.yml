@@ -2,7 +2,7 @@ name: daily-report
 
 on:
   schedule:
-    # 04:00 น. ไทย (21:00 UTC)
+    # 04:00 น. เวลาไทย (21:00 UTC)
     - cron: "0 21 * * *"
   workflow_dispatch:
 
@@ -32,7 +32,7 @@ jobs:
           echo "===== kernelspec list ====="
           jupyter kernelspec list
 
-      # รันโน้ตบุ๊ก + แปลงเป็น HTML ในคำสั่งเดียว (บังคับ kernel ตามชื่อด้านบน)
+      # รันโน้ตบุ๊ก + แปลงเป็น HTML (บังคับ kernel ให้ตรงกับที่เพิ่งลงทะเบียน)
       - name: Execute notebook -> HTML
         run: |
           mkdir -p docs
