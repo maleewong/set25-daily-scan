@@ -2,14 +2,15 @@ name: daily-report
 
 on:
   schedule:
-    - cron: "0 21 * * *"    # 04:00 น. เวลาไทย
+    # 04:00 น. ไทย (21:00 UTC)
+    - cron: "0 21 * * *"
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      KERNEL_NAME: gha-py311    # <<< ชื่อเดียวกับที่ run_daily.py อ่าน
+      KERNEL_NAME: gha-py311  # ชื่อ kernel ที่จะใช้รันโน้ตบุ๊ก
 
     steps:
       - name: Checkout repo
@@ -31,8 +32,18 @@ jobs:
           echo "===== kernelspec list ====="
           jupyter kernelspec list
 
-      - name: Run notebook and build HTML
-        run: python run_daily.py
+      # รันโน้ตบุ๊ก + แปลงเป็น HTML ในคำสั่งเดียว (บังคับ kernel ตามชื่อด้านบน)
+      - name: Execute notebook -> HTML
+        run: |
+          mkdir -p docs
+          jupyter nbconvert \
+            --to html \
+            --execute \
+            --ExecutePreprocessor.kernel_name="${KERNEL_NAME}" \
+            --ExecutePreprocessor.timeout=1800 \
+            WFO_test_no_out.ipynb \
+            --output "index.html" \
+            --output-dir docs
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -48,3 +59,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
+
