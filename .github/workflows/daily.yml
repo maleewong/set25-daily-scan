@@ -2,7 +2,7 @@ name: daily-report
 
 on:
   schedule:
-    - cron: "0 21 * * *"   # 04:00 น. ไทย
+    - cron: "0 21 * * *"   # 04:00 น. เวลาไทย
   workflow_dispatch:
 
 jobs:
@@ -28,8 +28,8 @@ jobs:
           python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
           jupyter kernelspec list
 
-      # ซ่อนโค้ดด้วย TemplateExporter.exclude_input=True
-      - name: Execute notebook -> HTML
+      # รันโน้ตบุ๊ก + ซ่อน code ใน HTML
+      - name: Execute notebook -> HTML (hide code)
         run: |
           mkdir -p docs
           jupyter nbconvert \
@@ -61,7 +61,7 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # ===== ส่งอีเมลหลัง deploy สำเร็จ =====
+      # ส่งอีเมลแจ้งลิงก์เว็บหลัง deploy สำเร็จ
       - name: Send report email
         if: ${{ success() }}
         uses: dawidd6/action-send-mail@v3
@@ -69,18 +69,17 @@ jobs:
           server_address: smtp.gmail.com
           server_port: 587
           secure: true
-          username: ${{ secrets.SMTP_USERNAME }}  # แนะนำตั้งใน Settings > Secrets
-          password: ${{ secrets.SMTP_PASSWORD }}  # ใช้ Gmail App Password
+          username: ${{ secrets.SMTP_USERNAME }}   # ใส่ใน Secrets
+          password: ${{ secrets.SMTP_PASSWORD }}   # Gmail App Password
           subject: "SET25 daily scan is updated"
-          # ส่งไปยังอีเมลปลายทาง (ถ้าต้องการ hardcode ก็ใส่ตรงนี้ได้)
-          to: ${{ secrets.MAIL_TO }}
+          to: ${{ secrets.MAIL_TO }}               # maleewong@gmail.com
           from: SET25 Bot <${{ secrets.SMTP_USERNAME }}>
           content_type: text/html
           body: >
             <p>สวัสดีครับ,</p>
-            <p>รายงานสรุปผลการสแกน SET25 วันนี้ พร้อมกราฟ อัปเดตแล้วที่ลิงก์ด้านล่าง:</p>
+            <p>รายงานอัปเดตแล้ว:</p>
             <p><a href="${{ steps.deployment.outputs.page_url }}" target="_blank">
             ${{
               steps.deployment.outputs.page_url
             }}</a></p>
-            <p>ขอบคุณครับ</p>
+            <p>ช่วง 7 วันล่าสุดแสดงบนหน้ารายงานแล้วครับ</p>
