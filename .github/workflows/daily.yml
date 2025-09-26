@@ -2,36 +2,45 @@ name: daily-report
 
 on:
   schedule:
-    # รันทุกวันเวลา 04:00 น. ตามเวลาไทย (21:00 UTC)
-    - cron: "0 21 * * *"
-  workflow_dispatch:  # เผื่อกดรันเองได้
+    - cron: "0 21 * * *"   # 04:00 น. ไทย
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      KERNEL_NAME: gha-py311
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies + register Jupyter kernel
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # ลงทะเบียน kernel ชื่อ python3 ให้ nbconvert/papermill ใช้งานได้
-          python -m ipykernel install --user --name=python3
 
-      # สคริปต์นี้ควร execute notebook (ด้วย papermill) แล้วแปลงเป็น HTML
-      # และวางผลลัพธ์ไว้ในโฟลเดอร์ docs/ (เช่น docs/index.html)
-      - name: Run notebook and build HTML
-        run: python run_daily.py
+      - name: Register Jupyter kernel in this venv
+        run: |
+          python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
+          echo "===== kernelspec list ====="
+          jupyter kernelspec list
 
-      # อัปโหลดไฟล์ใน docs/ เพื่อเตรียม deploy เป็น GitHub Pages
+      - name: Execute notebook -> HTML
+        run: |
+          mkdir -p docs
+          jupyter nbconvert \
+            --to html \
+            --execute \
+            --ExecutePreprocessor.kernel_name="${KERNEL_NAME}" \
+            --ExecutePreprocessor.timeout=1800 \
+            WFO_test_no_out.ipynb \
+            --output "index.html" \
+            --output-dir docs
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -44,5 +53,4 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v4
