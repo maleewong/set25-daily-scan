@@ -2,15 +2,14 @@ name: daily-report
 
 on:
   schedule:
-    # 04:00 น. เวลาไทย (21:00 UTC)
-    - cron: "0 21 * * *"
+    - cron: "0 21 * * *"    # 04:00 น. เวลาไทย
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      KERNEL_NAME: gha-py311      # <<< ให้ตรงกับ run_daily.py
+      KERNEL_NAME: gha-py311    # <<< ชื่อเดียวกับที่ run_daily.py อ่าน
 
     steps:
       - name: Checkout repo
@@ -29,6 +28,7 @@ jobs:
       - name: Register Jupyter kernel in this venv
         run: |
           python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
+          echo "===== kernelspec list ====="
           jupyter kernelspec list
 
       - name: Run notebook and build HTML
