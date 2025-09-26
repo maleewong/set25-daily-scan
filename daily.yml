@@ -1,20 +1,20 @@
 name: daily-report
 
 on:
-  schedule:
-    - cron: "0 21 * * *"   # 04:00 น. เวลาไทย
   workflow_dispatch:
+  schedule:
+    - cron: "0 1 * * *"   # รันทุกวัน 08:00 น. เวลาไทย (1:00 UTC)
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      KERNEL_NAME: gha-py311
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
@@ -23,63 +23,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Register Jupyter kernel in this venv
+      - name: Run daily scan (no output folders)
         run: |
-          python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
-          jupyter kernelspec list
+          python run_daily.py
 
-      # รันโน้ตบุ๊ก + ซ่อน code ใน HTML
-      - name: Execute notebook -> HTML (hide code)
+      - name: Prepare email body
+        id: prep_mail
         run: |
-          mkdir -p docs
-          jupyter nbconvert \
-            --to html \
-            --execute \
-            --ExecutePreprocessor.kernel_name="${KERNEL_NAME}" \
-            --ExecutePreprocessor.timeout=1800 \
-            --TemplateExporter.exclude_input=True \
-            WFO_test_no_out.ipynb \
-            --output "index.html" \
-            --output-dir docs
+          START_DATE=$(date -d "7 days ago" +'%Y-%m-%d')
+          END_DATE=$(date +'%Y-%m-%d')
+          echo "START_DATE=$START_DATE" >> $GITHUB_ENV
+          echo "END_DATE=$END_DATE" >> $GITHUB_ENV
+          echo "BODY=สรุปผลสแกนหุ้น SET25 ระหว่างวันที่ $START_DATE ถึง $END_DATE 
+          ดูผลได้ที่: https://maleewong.github.io/set25-daily-scan/" >> $GITHUB_ENV
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      # ส่งอีเมลแจ้งลิงก์เว็บหลัง deploy สำเร็จ
-      - name: Send report email
-        if: ${{ success() }}
+      - name: Send email
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 587
           secure: true
-          username: ${{ secrets.SMTP_USERNAME }}   # ใส่ใน Secrets
-          password: ${{ secrets.SMTP_PASSWORD }}   # Gmail App Password
-          subject: "SET25 daily scan is updated"
-          to: ${{ secrets.MAIL_TO }}               # maleewong@gmail.com
-          from: SET25 Bot <${{ secrets.SMTP_USERNAME }}>
-          content_type: text/html
-          body: >
-            <p>สวัสดีครับ,</p>
-            <p>รายงานอัปเดตแล้ว:</p>
-            <p><a href="${{ steps.deployment.outputs.page_url }}" target="_blank">
-            ${{
-              steps.deployment.outputs.page_url
-            }}</a></p>
-            <p>ช่วง 7 วันล่าสุดแสดงบนหน้ารายงานแล้วครับ</p>
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "SET25 สรุปรายงานประจำวันที่ ${{ env.END_DATE }}"
+          to: maleewong@gmail.com
+          from: "GitHub Action <${{ secrets.MAIL_USERNAME }}>"
+          body: ${{ env.BODY }}
