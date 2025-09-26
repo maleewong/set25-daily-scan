@@ -2,8 +2,7 @@ pandas
 numpy
 yfinance
 plotly
-papermill
-nbconvert
 jupyter
+nbconvert
 ipykernel
 nbclient
