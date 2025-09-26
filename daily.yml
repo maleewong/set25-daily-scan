@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      KERNEL_NAME: gha-py311  # ชื่อ kernel ที่จะใช้รันโน้ตบุ๊ก
+      KERNEL_NAME: gha-py311  # ชื่อ kernel ที่จะใช้รัน notebook
 
     steps:
       - name: Checkout repo
@@ -32,7 +32,7 @@ jobs:
           echo "===== kernelspec list ====="
           jupyter kernelspec list
 
-      # รันโน้ตบุ๊ก + แปลงเป็น HTML (บังคับ kernel ให้ตรงกับที่เพิ่งลงทะเบียน)
+      # 👉 ใช้ nbconvert รัน notebook และสร้าง HTML (ไม่เรียก run_daily.py)
       - name: Execute notebook -> HTML
         run: |
           mkdir -p docs
@@ -59,4 +59,3 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-
