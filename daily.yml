@@ -4,7 +4,7 @@ on:
   # รันอัตโนมัติทุกวัน 04:00 น. เวลาไทย (21:00 UTC ของวันก่อนหน้า)
   schedule:
     - cron: "0 21 * * *"
-  # กดรันเองได้จากแท็บ Actions
+  # กดรันเองได้
   workflow_dispatch:
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
           jupyter kernelspec list
 
-      # รันโน้ตบุ๊กโดยตรง + ซ่อนโค้ดใน HTML ที่เผยแพร่
+      # รันโน้ตบุ๊ก + ซ่อนโค้ด → สร้าง docs/index.html
       - name: Execute notebook -> HTML (hide code)
         run: |
           mkdir -p docs
@@ -54,37 +54,82 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # ต้องเพิ่มสิทธิ์ issues: write เพื่อสร้าง Issue
     permissions:
       pages: write
       id-token: write
+      issues: write
+      contents: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # เตรียมข้อความช่วง 7 วันล่าสุด (UTC)
+      # เตรียมข้อความช่วง 7 วันล่าสุด (ใช้เวลา UTC)
       - name: Prepare 7-day window text
         id: dates
         run: |
           echo "START_DATE=$(date -u -d '7 days ago' +'%Y-%m-%d')" >> $GITHUB_ENV
           echo "END_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - name: Send report email
-        if: ${{ success() }}
+      # สร้าง GitHub Issue แจ้งผลการรัน พร้อมลิงก์เว็บ
+      - name: Create GitHub Issue with today result
+        id: create_issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `SET25 daily scan ${process.env.END_DATE}`;
+            const body = [
+              `**สถานะ:** รันเสร็จแล้ว ✅`,
+              ``,
+              `**ช่วง 7 วันล่าสุด:** ${process.env.START_DATE} – ${process.env.END_DATE}`,
+              ``,
+              `**ลิงก์รายงานหน้าเว็บ:** ${process.env.DEPLOY_URL || '${{ steps.deployment.outputs.page_url }}'}`,
+              ``,
+              `> เข้าดูตารางและกราฟสรุปผลได้ที่ลิงก์ด้านบน`,
+            ].join('\n');
+
+            const {owner, repo} = context.repo;
+            const res = await github.rest.issues.create({
+              owner, repo,
+              title,
+              body,
+              labels: ['automation','daily-report']
+            });
+            core.setOutput('issue_url', res.data.html_url);
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          # ให้ตัวแปร DEPLOY_URL ใช้ได้ในบอดี้
+        env:
+          DEPLOY_URL: ${{ steps.deployment.outputs.page_url }}
+
+      # ===== (ออปชัน) ส่งอีเมลแจ้งผล พร้อมแนบลิงก์หน้าเว็บ + ลิงก์ Issue =====
+      # ตั้งค่า Secrets ก่อนใช้:
+      #   SMTP_USERNAME : อีเมลผู้ส่ง (เช่น Gmail)
+      #   SMTP_PASSWORD : Gmail App Password
+      #   MAIL_TO       : อีเมลผู้รับ (เช่น maleewong@gmail.com)
+      - name: Send report email (optional)
+        if: ${{ success() && secrets.MAIL_TO != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
-          secure: true                 # ใช้ SSL/TLS เต็มรูปแบบสำหรับ port 465
+          secure: true
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
           to: ${{ secrets.MAIL_TO }}
           from: SET25 Bot <${{ secrets.SMTP_USERNAME }}>
-          subject: "SET25 daily scan ${{ env.END_DATE }}"
+          subject: "SET25 daily scan ${{ env.END_DATE }} — finished"
           body: |
-            สรุปผลสแกนหุ้น SET25 ช่วง 7 วันล่าสุด: ${{ env.START_DATE }} – ${{ env.END_DATE }}
-            ดูรายงาน: ${{ steps.deployment.outputs.page_url }}
+            วันนี้รันเสร็จแล้วครับ ✅
+
+            ช่วง 7 วันล่าสุด: ${{ env.START_DATE }} – ${{ env.END_DATE }}
+            ลิงก์หน้าเว็บ: ${{ steps.deployment.outputs.page_url }}
+            ลิงก์ GitHub Issue: ${{ steps.create_issue.outputs.issue_url }}
+
+
 
