@@ -26,27 +26,61 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # ถ้าใช้ yfinance/plotly/nbconvert/ipykernel ฯลฯ ให้ใส่ไว้ใน requirements.txt
 
       - name: Register Jupyter kernel in this venv
         run: |
           python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
           jupyter kernelspec list
 
-      # สร้างไฟล์ HTML จากโน้ตบุ๊ก
-      - name: Execute notebook -> HTML (hide code)
+      - name: Show run date/time (Bangkok)
+        run: |
+          echo "=== Run at (Asia/Bangkok) ==="
+          date
+
+      # 1) Execute notebook ให้ได้ "ไฟล์ที่มีผลการรัน" (.ipynb)
+      - name: Execute notebook to executed-ipynb (proof of execution)
+        run: |
+          jupyter nbconvert \
+            --to notebook \
+            --execute \
+            --ExecutePreprocessor.kernel_name="${KERNEL_NAME}" \
+            --ExecutePreprocessor.timeout=1800 \
+            --log-level=INFO \
+            WFO_test_no_out.ipynb \
+            --output WFO_executed.ipynb
+
+      # 2) Verify: ต้องมี execution_count อย่างน้อย 1 cell (ถ้าไม่มีก็ fail)
+      - name: Verify executed notebook has execution counts
+        run: |
+          python - <<'PY'
+          import json, sys
+          with open("WFO_executed.ipynb", "r", encoding="utf-8") as f:
+            nb = json.load(f)
+          counts = [
+              c.get("execution_count")
+              for c in nb.get("cells", [])
+              if c.get("cell_type") == "code"
+          ]
+          ok = any(c is not None for c in counts)
+          if not ok:
+              print("ERROR: No execution_count found. Notebook was not executed.")
+              sys.exit(1)
+          print(f"OK: Found {sum(c is not None for c in counts)} executed code cells.")
+          PY
+
+      # 3) แปลงไฟล์ที่รันแล้ว -> HTML (เพื่อให้ output/data ฝังอยู่จริง)
+      - name: Convert executed notebook -> HTML (hide code)
         run: |
           mkdir -p docs
           jupyter nbconvert \
             --to html \
-            --execute \
-            --ExecutePreprocessor.kernel_name="${KERNEL_NAME}" \
-            --ExecutePreprocessor.timeout=1800 \
             --TemplateExporter.exclude_input=True \
-            WFO_test_no_out.ipynb \
+            WFO_executed.ipynb \
             --output "index.html" \
             --output-dir docs
 
-      # 👉 แทรกบรรทัดวันที่รันไว้บนสุดของ index.html
+      # 4) แทรกบรรทัด "รันอัตโนมัติเมื่อ:" ไว้บนสุดของหน้า
       - name: Insert run date at top of HTML
         run: |
           RUNDATE=$(date '+%Y-%m-%d %H:%M %Z')
