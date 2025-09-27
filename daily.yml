@@ -4,7 +4,6 @@ on:
   # รันอัตโนมัติทุกวันทำการ หลังตลาดไทยปิดและข้อมูลอัปเดตเสร็จ (07:30 น.ไทย = 00:30 UTC)
   schedule:
     - cron: "30 0 * * 1-5"
-  # สามารถกดรันเองได้จากแท็บ Actions
   workflow_dispatch:
 
 jobs:
@@ -12,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KERNEL_NAME: gha-py311
-      TZ: Asia/Bangkok     # ให้ทุก step อ้างอิงเวลาไทย
+      TZ: Asia/Bangkok
+      RUN_MARKER: "รันเสร็จแล้ว:"   # ← ปรับคำได้ที่นี่ถ้าต้องการ
 
     steps:
       - name: Checkout repository
@@ -63,22 +63,52 @@ jobs:
           print("OK: executed code cells =", sum(c is not None for c in counts))
           PY
 
-      # 3) Verify ว่ามี "รันเสร็จแล้ว:" จาก final cell (ต้องเพิ่มไว้ใน ipynb)
-      - name: Verify run marker in executed notebook
+      # 3) Verify ว่ามี "รันเสร็จแล้ว:" ทั้งใน markdown cells และ outputs ของ code cells
+      - name: Verify run marker in executed notebook (markdown or outputs)
         run: |
           python - <<'PY'
-          import json, sys
+          import json, sys, os
+          MARKER = os.environ.get("RUN_MARKER","รันเสร็จแล้ว:")
           with open("WFO_executed.ipynb","r",encoding="utf-8") as f:
               nb = json.load(f)
-          text = []
+
+          def text_from_output(out):
+              # รองรับทั้ง text/plain, text/markdown, text/html และ 'text' ธรรมดา
+              parts = []
+              if isinstance(out, dict):
+                  if 'text' in out and out['text']:
+                      parts.append(out['text'] if isinstance(out['text'], str) else ''.join(out['text']))
+                  data = out.get('data', {})
+                  for mime in ('text/markdown','text/plain','text/html'):
+                      if mime in data and data[mime]:
+                          val = data[mime]
+                          parts.append(val if isinstance(val, str) else ''.join(val))
+              return ''.join(parts)
+
+          # รวบรวมข้อความจาก markdown cells
+          md_text = []
           for c in nb.get("cells",[]):
               if c.get("cell_type")=="markdown":
                   src = c.get("source",[])
-                  text.append("".join(src) if isinstance(src,list) else str(src))
-          big = "\n".join(text)
-          if "รันเสร็จแล้ว:" not in big:
-              print("ERROR: Run marker 'รันเสร็จแล้ว:' not found in executed notebook.")
+                  md_text.append(''.join(src) if isinstance(src, list) else str(src))
+          md_blob = "\n".join(md_text)
+
+          # รวบรวมข้อความจาก outputs ของ code cells
+          out_text = []
+          for c in nb.get("cells",[]):
+              if c.get("cell_type")=="code":
+                  for o in c.get("outputs", []):
+                      out_text.append(text_from_output(o))
+          out_blob = "\n".join(out_text)
+
+          big = md_blob + "\n" + out_blob
+          if MARKER not in big:
+              print(f"ERROR: Run marker '{MARKER}' not found in executed notebook.")
+              # ในกรณีที่ใช้คำภาษาอังกฤษ ให้ลองหา 'Run finished' เป็น fallback
+              if "Run finished" in big or "finished at" in big:
+                  print("NOTE: Found English run marker fallback, but not the Thai marker.")
               sys.exit(1)
+
           print("OK: found run marker in executed notebook.")
           PY
 
