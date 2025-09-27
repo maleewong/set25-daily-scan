@@ -1,10 +1,9 @@
 name: daily-report
 
 on:
-  # รันอัตโนมัติทุกวันทำการ หลังตลาดไทยปิดและผู้ให้ข้อมูลอัปเดตเสร็จ (07:30 น. เวลาไทย = 00:30 UTC)
+  # รันอัตโนมัติทุกวันทำการ หลังตลาดไทยปิดและข้อมูลอัปเดตเสร็จ (07:30 น. เวลาไทย = 00:30 UTC)
   schedule:
-    - cron: "30 0 * * 1-5"   # จันทร์–ศุกร์
-  # กดรันเองได้จากแท็บ Actions
+    - cron: "30 0 * * 1-5"
   workflow_dispatch:
 
 jobs:
@@ -12,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KERNEL_NAME: gha-py311
-      TZ: Asia/Bangkok        # ใช้เวลาไทยภายใน workflow
+      TZ: Asia/Bangkok
 
     steps:
       - name: Checkout
@@ -33,13 +32,7 @@ jobs:
           python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
           jupyter kernelspec list
 
-      # 👉 แสดงวันที่และเวลาที่รัน (เพิ่มใหม่)
-      - name: Show run date and time (Bangkok)
-        run: |
-          echo "=== Workflow run date/time (Asia/Bangkok) ==="
-          date
-
-      # รันโน้ตบุ๊ก + ซ่อนโค้ด แล้วเซฟเป็น docs/index.html
+      # สร้างไฟล์ HTML จากโน้ตบุ๊ก
       - name: Execute notebook -> HTML (hide code)
         run: |
           mkdir -p docs
@@ -52,6 +45,14 @@ jobs:
             WFO_test_no_out.ipynb \
             --output "index.html" \
             --output-dir docs
+
+      # 👉 แทรกบรรทัดวันที่รันไว้บนสุดของ index.html
+      - name: Insert run date at top of HTML
+        run: |
+          RUNDATE=$(date '+%Y-%m-%d %H:%M %Z')
+          echo "<div style='margin:10px 0;padding:8px 12px;background:#e0f7fa;
+                 font-size:16px;'><b>รันอัตโนมัติเมื่อ:</b> ${RUNDATE}</div>" \
+                 | cat - docs/index.html > docs/index.tmp && mv docs/index.tmp docs/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
