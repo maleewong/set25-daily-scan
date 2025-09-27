@@ -1,9 +1,10 @@
 name: daily-report
 
 on:
-  # รันอัตโนมัติทุกวันทำการ หลังตลาดไทยปิดและข้อมูลอัปเดตเสร็จ (07:30 น. เวลาไทย = 00:30 UTC)
+  # รันอัตโนมัติทุกวันทำการ หลังตลาดไทยปิดและข้อมูลอัปเดตเสร็จ (07:30 น.ไทย = 00:30 UTC)
   schedule:
     - cron: "30 0 * * 1-5"
+  # สามารถกดรันเองได้จากแท็บ Actions
   workflow_dispatch:
 
 jobs:
@@ -11,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KERNEL_NAME: gha-py311
-      TZ: Asia/Bangkok
+      TZ: Asia/Bangkok     # ให้ทุก step อ้างอิงเวลาไทย
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -26,19 +27,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # ถ้าใช้ yfinance/plotly/nbconvert/ipykernel ฯลฯ ให้ใส่ไว้ใน requirements.txt
 
-      - name: Register Jupyter kernel in this venv
+      - name: Register Jupyter kernel
         run: |
           python -m ipykernel install --name "${KERNEL_NAME}" --sys-prefix
           jupyter kernelspec list
 
       - name: Show run date/time (Bangkok)
         run: |
-          echo "=== Run at (Asia/Bangkok) ==="
+          echo "=== Workflow run at (Asia/Bangkok) ==="
           date
 
-      # 1) Execute notebook ให้ได้ "ไฟล์ที่มีผลการรัน" (.ipynb)
+      # 1) Execute notebook -> ได้ไฟล์ที่รันแล้วจริง (.ipynb)
       - name: Execute notebook to executed-ipynb (proof of execution)
         run: |
           jupyter nbconvert \
@@ -46,30 +46,43 @@ jobs:
             --execute \
             --ExecutePreprocessor.kernel_name="${KERNEL_NAME}" \
             --ExecutePreprocessor.timeout=1800 \
-            --log-level=INFO \
             WFO_test_no_out.ipynb \
             --output WFO_executed.ipynb
 
-      # 2) Verify: ต้องมี execution_count อย่างน้อย 1 cell (ถ้าไม่มีก็ fail)
-      - name: Verify executed notebook has execution counts
+      # 2) Verify ว่ามี execution_count (ยืนยันว่ารันจริง)
+      - name: Verify executed counts exist
         run: |
           python - <<'PY'
           import json, sys
-          with open("WFO_executed.ipynb", "r", encoding="utf-8") as f:
-            nb = json.load(f)
-          counts = [
-              c.get("execution_count")
-              for c in nb.get("cells", [])
-              if c.get("cell_type") == "code"
-          ]
-          ok = any(c is not None for c in counts)
-          if not ok:
-              print("ERROR: No execution_count found. Notebook was not executed.")
+          with open("WFO_executed.ipynb","r",encoding="utf-8") as f:
+              nb = json.load(f)
+          counts = [c.get("execution_count") for c in nb.get("cells",[]) if c.get("cell_type")=="code"]
+          if not any(c is not None for c in counts):
+              print("ERROR: No execution_count found -> notebook not executed.")
               sys.exit(1)
-          print(f"OK: Found {sum(c is not None for c in counts)} executed code cells.")
+          print("OK: executed code cells =", sum(c is not None for c in counts))
           PY
 
-      # 3) แปลงไฟล์ที่รันแล้ว -> HTML (เพื่อให้ output/data ฝังอยู่จริง)
+      # 3) Verify ว่ามี "รันเสร็จแล้ว:" จาก final cell (ต้องเพิ่มไว้ใน ipynb)
+      - name: Verify run marker in executed notebook
+        run: |
+          python - <<'PY'
+          import json, sys
+          with open("WFO_executed.ipynb","r",encoding="utf-8") as f:
+              nb = json.load(f)
+          text = []
+          for c in nb.get("cells",[]):
+              if c.get("cell_type")=="markdown":
+                  src = c.get("source",[])
+                  text.append("".join(src) if isinstance(src,list) else str(src))
+          big = "\n".join(text)
+          if "รันเสร็จแล้ว:" not in big:
+              print("ERROR: Run marker 'รันเสร็จแล้ว:' not found in executed notebook.")
+              sys.exit(1)
+          print("OK: found run marker in executed notebook.")
+          PY
+
+      # 4) แปลงไฟล์ที่รันแล้ว -> HTML (ซ่อนโค้ด) เพื่อเผยแพร่
       - name: Convert executed notebook -> HTML (hide code)
         run: |
           mkdir -p docs
@@ -77,16 +90,8 @@ jobs:
             --to html \
             --TemplateExporter.exclude_input=True \
             WFO_executed.ipynb \
-            --output "index.html" \
+            --output index.html \
             --output-dir docs
-
-      # 4) แทรกบรรทัด "รันอัตโนมัติเมื่อ:" ไว้บนสุดของหน้า
-      - name: Insert run date at top of HTML
-        run: |
-          RUNDATE=$(date '+%Y-%m-%d %H:%M %Z')
-          echo "<div style='margin:10px 0;padding:8px 12px;background:#e0f7fa;
-                 font-size:16px;'><b>รันอัตโนมัติเมื่อ:</b> ${RUNDATE}</div>" \
-                 | cat - docs/index.html > docs/index.tmp && mv docs/index.tmp docs/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -106,7 +111,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-
-
-
