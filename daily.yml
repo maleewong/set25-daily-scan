@@ -3,7 +3,7 @@ name: daily-report
 on:
   # รันอัตโนมัติทุกวันทำการ หลังตลาดไทยปิดและข้อมูลอัปเดตเสร็จ (07:30 น.ไทย = 00:30 UTC)
   schedule:
-      - cron: "*/5 * * * *"
+      - cron: "30 0 * * 1-5"
   workflow_dispatch:
 
 jobs:
@@ -141,6 +141,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
 
 
 
